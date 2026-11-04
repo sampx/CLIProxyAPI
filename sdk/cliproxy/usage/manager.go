@@ -598,7 +598,20 @@ func RegisterPlugin(plugin Plugin) { DefaultManager().Register(plugin) }
 func RegisterNamedPlugin(name string, plugin Plugin) { DefaultManager().RegisterNamed(name, plugin) }
 
 // PublishRecord publishes a record using the default manager.
-func PublishRecord(ctx context.Context, record Record) { DefaultManager().Publish(ctx, record) }
+type recordingDisabledKey struct{}
+
+// WithoutRecording isolates embedded execution from global usage plugins and
+// their dispatcher. Token counts still remain in provider response payloads.
+func WithoutRecording(ctx context.Context) context.Context {
+	return context.WithValue(ctx, recordingDisabledKey{}, true)
+}
+
+func PublishRecord(ctx context.Context, record Record) {
+	if ctx != nil && ctx.Value(recordingDisabledKey{}) == true {
+		return
+	}
+	DefaultManager().Publish(ctx, record)
+}
 
 // StartDefault starts the default manager's dispatcher.
 func StartDefault(ctx context.Context) { DefaultManager().Start(ctx) }

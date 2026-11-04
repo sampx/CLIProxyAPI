@@ -535,7 +535,7 @@ func ConvertOpenAIChatCompletionsResponseToOpenAIResponses(ctx context.Context, 
 		partDone, _ = sjson.SetBytes(partDone, "output_index", st.ReasoningIndex)
 		partDone, _ = sjson.SetBytes(partDone, "part.text", text)
 		out = append(out, emitRespEvent("response.reasoning_summary_part.done", partDone))
-		outputItemDone := []byte(`{"type":"response.output_item.done","item":{"id":"","type":"reasoning","encrypted_content":"","summary":[{"type":"summary_text","text":""}]},"output_index":0,"sequence_number":0}`)
+		outputItemDone := []byte(`{"type":"response.output_item.done","item":{"id":"","type":"reasoning","summary":[{"type":"summary_text","text":""}]},"output_index":0,"sequence_number":0}`)
 		outputItemDone, _ = sjson.SetBytes(outputItemDone, "sequence_number", nextSeq())
 		outputItemDone, _ = sjson.SetBytes(outputItemDone, "item.id", st.ReasoningID)
 		outputItemDone, _ = sjson.SetBytes(outputItemDone, "output_index", st.ReasoningIndex)
@@ -1034,7 +1034,7 @@ func ConvertOpenAIChatCompletionsResponseToOpenAIResponsesNonStream(_ context.Co
 			rid = strings.TrimPrefix(rid, "resp_")
 		}
 		// Prefer summary_text from reasoning_content; encrypted_content is optional
-		reasoningItem := []byte(`{"id":"","type":"reasoning","encrypted_content":"","summary":[]}`)
+		reasoningItem := []byte(`{"id":"","type":"reasoning","summary":[]}`)
 		reasoningItem, _ = sjson.SetBytes(reasoningItem, "id", fmt.Sprintf("rs_%s", rid))
 		if rcText != "" {
 			reasoningItem, _ = sjson.SetBytes(reasoningItem, "summary.0.type", "summary_text")

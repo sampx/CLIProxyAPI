@@ -74,6 +74,19 @@ func ResolvedModelInfo(req cliproxyexecutor.Request) (*registry.ModelInfo, bool)
 	return ResolvedAPIKeyModelInfo(req)
 }
 
+// BindResolvedModelInfo gives an exact-route host a request-local capability
+// snapshot without publishing to the process-global model registry.
+func BindResolvedModelInfo(req cliproxyexecutor.Request, info *registry.ModelInfo) cliproxyexecutor.Request {
+	req.Metadata = maps.Clone(req.Metadata)
+	if req.Metadata == nil {
+		req.Metadata = map[string]any{}
+	}
+	if info != nil {
+		req.Metadata[resolvedAPIKeyModelInfoMetadataKey] = registry.CloneModelInfo(info)
+	}
+	return req
+}
+
 // ResolvedHomeModelOptions returns the credential model options selected for this attempt.
 // A present but unmatched or empty models list yields zero-value options.
 func ResolvedHomeModelOptions(req cliproxyexecutor.Request) (internalconfig.OpenAICompatibilityModel, bool) {

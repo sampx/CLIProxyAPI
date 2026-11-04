@@ -810,6 +810,9 @@ func (r *ModelRegistry) removeModelRegistration(clientID, modelID, provider stri
 	}
 }
 
+// CloneModelInfo copies all mutable capability fields for request-local binding.
+func CloneModelInfo(model *ModelInfo) *ModelInfo { return cloneModelInfo(model) }
+
 func cloneModelInfo(model *ModelInfo) *ModelInfo {
 	if model == nil {
 		return nil

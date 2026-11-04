@@ -124,33 +124,6 @@ func convertOpenAIResponsesRequestToOpenAIChatCompletions(modelName string, inpu
 			}
 		}
 
-		hasReasoningInSession := false
-		if effortRes := root.Get("reasoning.effort"); effortRes.Exists() {
-			effort := strings.ToLower(strings.TrimSpace(effortRes.String()))
-			if effort != "" && effort != "none" && effort != "0" && effort != "false" {
-				hasReasoningInSession = true
-			}
-		} else if effortRes := root.Get("reasoning_effort"); effortRes.Exists() {
-			effort := strings.ToLower(strings.TrimSpace(effortRes.String()))
-			if effort != "" && effort != "none" && effort != "0" && effort != "false" {
-				hasReasoningInSession = true
-			}
-		} else if reasoningObj := root.Get("reasoning"); reasoningObj.Exists() {
-			reasoningRaw := strings.ToLower(strings.TrimSpace(reasoningObj.String()))
-			if reasoningRaw != "" && reasoningRaw != "none" && reasoningRaw != "false" && reasoningRaw != "{}" {
-				hasReasoningInSession = true
-			}
-		}
-		if !hasReasoningInSession {
-			for _, item := range rawInputArray {
-				itemType := item.Get("type").String()
-				if itemType == "reasoning" || item.Get("reasoning_content").Exists() {
-					hasReasoningInSession = true
-					break
-				}
-			}
-		}
-
 		pendingToolCalls := make([]interface{}, 0)
 		pendingToolCallIDs := make([]string, 0)
 		pendingReasoningContent := ""
@@ -162,9 +135,6 @@ func convertOpenAIResponsesRequestToOpenAIChatCompletions(modelName string, inpu
 		fallbackToolReasoning := func() string {
 			if latestReasoningContent != "" {
 				return latestReasoningContent
-			}
-			if hasReasoningInSession {
-				return "[reasoning unavailable]"
 			}
 			return ""
 		}
@@ -797,9 +767,6 @@ func collectOpenAIResponsesReasoningContent(item gjson.Result) string {
 			reasoningText.WriteString(summaryItem.Get("text").String())
 			return true
 		})
-	}
-	if reasoningText.Len() == 0 {
-		return "[reasoning unavailable]"
 	}
 	return reasoningText.String()
 }
