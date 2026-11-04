@@ -42,6 +42,14 @@ remain in this repository.
 Gateway routing, capabilities, quota, model roles, catalog, client policy and
 public API ownership stay in Gateway. They do not belong in this fork.
 
+## Verification fixture
+
+The existing Service concurrency regression waits for the final published model
+state after watcher dispatch, while retaining both prefix and model assertions.
+Management-handler completion is not a model-publication completion signal.
+The wait observes registry state and fails on non-convergence; it changes no
+production Service code.
+
 ## Upgrade
 
 1. Fetch `upstream` and update the mirror `main`.

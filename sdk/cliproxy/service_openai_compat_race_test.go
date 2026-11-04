@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -178,11 +179,27 @@ func TestPutOpenAICompatConcurrentWithAuthFieldsPatch_Issue6559(t *testing.T) {
 	service.registerConfigAPIKeyAuths(ctx, service.currentConfig())
 
 	finalPrefixModel := fmt.Sprintf("pfx-%d/gpt-6-astra", iterations-1)
+	// Watcher dispatch and model publication are asynchronous. Management
+	// handlers finishing is not a completion signal for both publications.
+	// Wait on the published result; the original assertions below remain and
+	// a permanently lost prefix/model still fails at the deadline.
+	finalCompatAlias := fmt.Sprintf("alias-%d", iterations-1)
+	waitForFinalModelPublication(t, func() bool {
+		if !reg.ClientSupportsModel(authID, finalPrefixModel) {
+			return false
+		}
+		for _, entry := range service.coreManager.List() {
+			if entry != nil && reg.ClientSupportsModel(entry.ID, finalCompatAlias) {
+				return true
+			}
+		}
+		return false
+	})
+
 	if !reg.ClientSupportsModel(authID, finalPrefixModel) {
 		t.Fatalf("expected auth %s to support final prefixed model %q", authID, finalPrefixModel)
 	}
 
-	finalCompatAlias := fmt.Sprintf("alias-%d", iterations-1)
 	foundCompatModel := false
 	for _, a := range service.coreManager.List() {
 		if a != nil && reg.ClientSupportsModel(a.ID, finalCompatAlias) {
@@ -349,5 +366,29 @@ func TestPutOpenAICompatConcurrentWithConfigReloadAndAuthUpdate_Issue6559(t *tes
 	}
 	if !foundReloadModel {
 		t.Fatalf("expected registered openai-compatibility auth to support final reloaded model %q", finalReloadAlias)
+	}
+}
+
+// Polling is limited to the registry's published state, rather than a fixed
+// delay or rerunning the workload. The timeout is only a deadlock backstop.
+func waitForFinalModelPublication(t *testing.T, ready func() bool) {
+	t.Helper()
+	if ready() {
+		return
+	}
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			if ready() {
+				t.Log("final model publication completed after handler return")
+				return
+			}
+		case <-deadline.C:
+			t.Fatal("final model publication did not converge")
+		}
 	}
 }
