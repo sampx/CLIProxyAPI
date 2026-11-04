@@ -88,6 +88,9 @@ func RewriteCodexOrphanDelegationInputForConfig(ctx context.Context, headers htt
 
 // TranslateRequestWithCodexMultiAgentV2 normalizes official Codex multi-agent
 // input before translating it to a non-Codex target protocol.
+// TranslateRequestWithCodexMultiAgentV2 applies only the portable task and tool
+// rewrites. Namespace optimization belongs to the authenticated Codex executor,
+// which restores its own namespace in the response.
 func TranslateRequestWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream bool) []byte {
 	return TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx, headers, cfg, from, to, sdktranslator.RequestEnvelope{
 		Format: from,
@@ -97,13 +100,12 @@ func TranslateRequestWithCodexMultiAgentV2(ctx context.Context, headers http.Hea
 	}).Body
 }
 
-// TranslateRequestEnvelopeWithCodexMultiAgentV2 normalizes official Codex
-// multi-agent input while preserving request-scoped translation metadata.
 func TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, req sdktranslator.RequestEnvelope) sdktranslator.RequestEnvelope {
 	if from == sdktranslator.FormatOpenAIResponse {
 		req.Body = RewriteCodexOrphanDelegationInputForConfig(ctx, headers, req.Body, cfg)
 		if to != sdktranslator.FormatCodex && to != sdktranslator.FormatOpenAIResponse {
-			req.Body = RewriteCodexMultiAgentV2Input(ctx, headers, req.Body, cfg)
+			req.Body = rewriteCodexAgentMessageContent(req.Body)
+			req.Body = removeCodexCollaborationMessageEncryption(req.Body, codexCollaborationMessageToolPaths(req.Body))
 		}
 	}
 	return sdktranslator.TranslateRequestEnvelope(ctx, from, to, req)

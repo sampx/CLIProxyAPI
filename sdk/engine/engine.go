@@ -11,8 +11,11 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	runtime "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
@@ -130,6 +133,10 @@ func (e *Engine) start(ctx context.Context, req Request) (context.Context, func(
 	ctx, cancel := context.WithCancel(ctx)
 	ctx = usage.WithoutRecording(ctx)
 	ctx = context.WithValue(ctx, "cliproxy.roundtripper", e.transport)
+	ctx = helps.EnsureSessionContext(ctx, req.Options, req.Request.Payload)
+	if !util.HasExplicitSessionID(ctx) {
+		ctx = util.WithSessionID(ctx, uuid.NewString())
+	}
 	stop := context.AfterFunc(e.ctx, cancel)
 	finish := func() { stop(); cancel(); e.wg.Done() }
 	if err := ctx.Err(); err != nil {
