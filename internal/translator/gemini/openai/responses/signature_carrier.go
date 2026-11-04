@@ -25,6 +25,17 @@ const (
 	geminiResponsesCarrierSummaryField   = "_cpa_reasoning_summary"
 )
 
+// CompatibleReasoningCarrier verifies the same envelope used by the request
+// translator before an embedded host accepts opaque Gemini reasoning replay.
+func CompatibleReasoningCarrier(raw string) bool {
+	value, _, target, _, ok := decodeGeminiResponsesCarrier(raw)
+	if !ok {
+		return false
+	}
+	_, ok = compatibleGeminiResponsesCarrierSignature(value, target)
+	return ok
+}
+
 func encodeGeminiResponsesCarrier(rawSignature, direction, targetKind string) string {
 	rawSignature = strings.TrimSpace(rawSignature)
 	if rawSignature == "" {

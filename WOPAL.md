@@ -27,14 +27,17 @@ remain in this repository.
   rules for a standard Responses upstream. It preserves native Items and opaque
   reasoning, supports actual non-streaming HTTP and SSE, and applies no Codex
   account policy, replay cache, forced streaming or hosted-tool injection.
+- `sdk/client/codex` exposes optional portable input preparation for the host
+  caller, outside Engine execution. Upstream client-policy helpers remain intact.
 - `auth.BindResolvedModelInfo` and `registry.CloneModelInfo` reuse upstream's
   capability representation and clone logic at the public execution seam.
 - `usage.WithoutRecording` lets an embedded caller keep execution separate from
   global usage plugins. Provider response usage is unchanged.
 - Responses-to-Chat conversion emits only actual reasoning text. Empty reasoning
   does not create placeholder text. Chat-to-Responses conversion does not create
-  empty encrypted signatures. Opaque reasoning sent to a different protocol
-  fails explicitly before upstream execution.
+  empty encrypted signatures. Recognized Claude/Gemini reasoning carriers replay through their matching
+  translators. Unknown or mismatched opaque state fails explicitly before
+  upstream execution.
 
 Gateway routing, capabilities, quota, model roles, catalog, client policy and
 public API ownership stay in Gateway. They do not belong in this fork.

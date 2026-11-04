@@ -15,6 +15,8 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	runtime "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
+	clauderesponses "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/responses"
+	geminiresponses "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/gemini/openai/responses"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
@@ -122,6 +124,16 @@ func (e *Engine) start(ctx context.Context, req Request) (context.Context, func(
 		if json.Unmarshal(req.Request.Payload, &body) == nil {
 			for _, item := range body.Input {
 				if item.Type == "reasoning" && item.Encrypted != "" {
+					compatible := false
+					switch credential.Provider {
+					case "claude":
+						compatible = clauderesponses.CompatibleReasoningCarrier(item.Encrypted)
+					case "gemini":
+						compatible = geminiresponses.CompatibleReasoningCarrier(item.Encrypted)
+					}
+					if compatible {
+						continue
+					}
 					e.mu.Unlock()
 					return nil, nil, nil, nil, req.Request, &UnsupportedReasoningError{}
 				}

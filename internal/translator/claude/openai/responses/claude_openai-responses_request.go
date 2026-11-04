@@ -928,6 +928,16 @@ func responsesRedactedThinkingData(encryptedContent string) (string, bool) {
 	return strings.TrimSpace(strings.TrimPrefix(trimmed, ClaudeResponsesRedactedThinkingPrefix)), true
 }
 
+// CompatibleReasoningCarrier accepts only the native carrier forms that this
+// translator can replay without dropping or inventing a thinking block.
+func CompatibleReasoningCarrier(raw string) bool {
+	if data, redacted := responsesRedactedThinkingData(raw); redacted {
+		return data != ""
+	}
+	_, ok := sigcompat.CompatibleSignatureForProvider(sigcompat.SignatureProviderClaude, raw)
+	return ok
+}
+
 // responsesReasoningText collects the reasoning text of a Responses item. OpenAI
 // splits it across summary[] parts of type summary_text and content[] parts of
 // type reasoning_text. Claude only ever produces summaries, but callers echo the
