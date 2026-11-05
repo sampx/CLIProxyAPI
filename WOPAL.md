@@ -44,11 +44,19 @@ public API ownership stay in Gateway. They do not belong in this fork.
 
 ## Verification fixture
 
+The watcher acknowledges the config hash observed before a reload, rather than
+rereading the file after publication. A concurrent management save must remain
+eligible for the next reload until its content is applied. A deterministic
+regression writes that newer config inside the previous reload callback.
+Each watcher's detection, publication callback and hash acknowledgement share
+one execution lock, so overlapping reloads cannot publish in reverse order.
+
 The existing Service concurrency regression waits for the final published model
 state after watcher dispatch, while retaining both prefix and model assertions.
 Management-handler completion is not a model-publication completion signal.
 The wait observes registry state and fails on non-convergence; it changes no
-production Service code.
+production Service code. The hash fix above prevents permanently skipped updates
+that waiting alone cannot repair.
 
 ## Upgrade
 

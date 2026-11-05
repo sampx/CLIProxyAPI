@@ -230,6 +230,101 @@ func TestReloadConfigIfChanged_TriggersOnChangeAndSkipsUnchanged(t *testing.T) {
 	}
 }
 
+func TestReloadConfigIfChangedDoesNotAcknowledgeUnappliedWrite(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	writeConfig := func(port int) {
+		t.Helper()
+		data, err := yaml.Marshal(&config.Config{Port: port, AuthDir: dir, CredentialInFlight: config.DefaultCredentialInFlightConfig()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeConfig(8080)
+	var ports []int
+	w := &Watcher{configPath: path, authDir: dir, reloadCallback: func(cfg *config.Config) {
+		ports = append(ports, cfg.Port)
+		if len(ports) == 1 {
+			// A management save can finish while the previous reload publishes.
+			writeConfig(9090)
+		}
+	}}
+	w.ReloadConfigIfChanged()
+	w.ReloadConfigIfChanged()
+	if len(ports) != 2 || ports[0] != 8080 || ports[1] != 9090 {
+		t.Fatalf("newer configuration was acknowledged without being applied: ports=%v", ports)
+	}
+	w.ReloadConfigIfChanged()
+	if len(ports) != 2 {
+		t.Fatalf("unchanged configuration reloaded: ports=%v", ports)
+	}
+}
+
+func TestReloadConfigIfChangedSerializesPublication(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	writeConfig := func(port int) {
+		t.Helper()
+		data, err := yaml.Marshal(&config.Config{Port: port, AuthDir: dir, CredentialInFlight: config.DefaultCredentialInFlightConfig()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeConfig(8080)
+	firstStarted := make(chan struct{})
+	finishFirst := make(chan struct{})
+	firstDone := make(chan struct{})
+	releaseFirst := sync.OnceFunc(func() { close(finishFirst) })
+	var ports []int
+	w := &Watcher{configPath: path, authDir: dir, reloadCallback: func(cfg *config.Config) {
+		if cfg.Port == 8080 {
+			close(firstStarted)
+			<-finishFirst
+		}
+		ports = append(ports, cfg.Port)
+	}}
+	go func() {
+		defer close(firstDone)
+		w.ReloadConfigIfChanged()
+	}()
+	t.Cleanup(func() {
+		releaseFirst()
+		<-firstDone
+	})
+	<-firstStarted
+	// The publication callback must still own the transaction lock. Checking
+	// ownership here deterministically rejects an unlocked/early-unlocked reload,
+	// without guessing whether the second goroutine has run yet.
+	if w.reloadExecutionMu.TryLock() {
+		w.reloadExecutionMu.Unlock()
+		releaseFirst()
+		<-firstDone
+		t.Fatal("reload transaction released before publication completed")
+	}
+	writeConfig(9090)
+	secondStarted := make(chan struct{})
+	secondDone := make(chan struct{})
+	go func() {
+		defer close(secondDone)
+		close(secondStarted)
+		w.ReloadConfigIfChanged()
+	}()
+	<-secondStarted
+	releaseFirst()
+	<-firstDone
+	<-secondDone
+	w.ReloadConfigIfChanged()
+	if len(ports) != 2 || ports[0] != 8080 || ports[1] != 9090 || w.config.Port != 9090 {
+		t.Fatalf("overlapping reloads lost or repeated the final configuration: ports=%v config=%d", ports, w.config.Port)
+	}
+}
+
 func TestStartAndStopSuccess(t *testing.T) {
 	tmpDir := t.TempDir()
 	authDir := filepath.Join(tmpDir, "auth")
